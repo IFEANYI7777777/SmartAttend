@@ -1,26 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 
+;
 function App() {
- const [backendMessage, setBackendMessage] = useState("");
+  const [backendMessage, setBackendMessage] = useState("");
+  const [employees, setEmployees] = useState([]);
 
-  const employees = [
-  {
-    pin: "1234",
-    name: "Ifeanyi Test",
-    section: "Sports",
-  },
-  {
-    pin: "5678",
-    name: "Jane Doe",
-    section: "Kitchen",
-  },
-  {
-    pin: "2468",
-    name: "Mike Smith",
-    section: "Electronics",
-  },
-];
+
 useEffect(() => {
   fetch("http://localhost:5000/api/health")
     .then((response) => response.json())
@@ -29,6 +15,16 @@ useEffect(() => {
     })
     .catch((error) => {
       console.error("Backend connection error:", error);
+    });
+}, []);
+useEffect(() => {
+  fetch("http://localhost:5000/api/employees")
+    .then((response) => response.json())
+    .then((data) => {
+      setEmployees(data);
+    })
+    .catch((error) => {
+      console.error("Employee loading error:", error);
     });
 }, []);
 
