@@ -1,92 +1,159 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 
-;
 function App() {
   const [backendMessage, setBackendMessage] = useState("");
   const [employees, setEmployees] = useState([]);
 
+  // Employee registration states
+  const [showRegister, setShowRegister] = useState(false);
+  const [employeeName, setEmployeeName] = useState("");
+  const [employeeSection, setEmployeeSection] = useState("");
+  const [employeePin, setEmployeePin] = useState("");
+  const [registerMessage, setRegisterMessage] = useState("");
 
-useEffect(() => {
-  fetch("http://localhost:5000/api/health")
-    .then((response) => response.json())
-    .then((data) => {
-      setBackendMessage(data.message);
-    })
-    .catch((error) => {
-      console.error("Backend connection error:", error);
-    });
-}, []);
-useEffect(() => {
-  fetch("http://localhost:5000/api/employees")
-    .then((response) => response.json())
-    .then((data) => {
-      setEmployees(data);
-    })
-    .catch((error) => {
-      console.error("Employee loading error:", error);
-    });
-}, []);
-
+  // Attendance states
   const videoRef = useRef(null);
-const [started, setStarted] = useState(false);
-const [employee, setEmployee] = useState(null);
-const [pin, setPin] = useState("");
-const [error, setError] = useState("");
-useEffect(() => {
-  if (!started || employee) return;
+  const [started, setStarted] = useState(false);
+  const [employee, setEmployee] = useState(null);
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
 
-  let stream;
-
-  const startCamera = async () => {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+  // Check backend connection
+  useEffect(() => {
+    fetch("http://localhost:5000/api/health")
+      .then((response) => response.json())
+      .then((data) => {
+        setBackendMessage(data.message);
+      })
+      .catch((error) => {
+        console.error("Backend connection error:", error);
       });
+  }, []);
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+  // Load employees from backend
+  useEffect(() => {
+    fetch("http://localhost:5000/api/employees")
+      .then((response) => response.json())
+      .then((data) => {
+        setEmployees(data);
+      })
+      .catch((error) => {
+        console.error("Employee loading error:", error);
+      });
+  }, []);
+
+  // Start camera
+  useEffect(() => {
+    if (!started || employee) return;
+
+    let stream;
+
+    const startCamera = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (error) {
+        console.error("Camera access denied:", error);
       }
-    } catch (error) {
-      console.error("Camera access denied:", error);
-    }
-  };
+    };
 
-  startCamera();
+    startCamera();
 
-  return () => {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-    }
-  };
-}, [started, employee]);
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [started, employee]);
 
+  // Temporary face scan simulation
   const simulateFaceScan = () => {
-  setEmployee({
-    name: "Ifeanyi Test",
-    section: "Sports",
-    time: new Date().toLocaleTimeString(),
-  });
-};
-const verifyPin = () => {
-  const foundEmployee = employees.find(
-    (employee) => employee.pin === pin
-  );
+    setEmployee({
+      name: "Ifeanyi Test",
+      section: "Sports",
+      time: new Date().toLocaleTimeString(),
+    });
+  };
 
-  if (!foundEmployee) {
-    setError("Invalid PIN. Please try again.");
-    return;
-  }
+  // Verify employee PIN
+  const verifyPin = () => {
+    const foundEmployee = employees.find(
+      (employee) => employee.pin === pin
+    );
 
-  setError("");
+    if (!foundEmployee) {
+      setError("Invalid PIN. Please try again.");
+      return;
+    }
 
-  setEmployee({
-    name: foundEmployee.name,
-    section: foundEmployee.section,
-    time: new Date().toLocaleTimeString(),
-  });
-};
+    setError("");
 
+    setEmployee({
+      name: foundEmployee.name,
+      section: foundEmployee.section,
+      time: new Date().toLocaleTimeString(),
+    });
+  };
+
+  // Register a new employee
+  const registerEmployee = () => {
+    if (!employeeName || !employeeSection || !employeePin) {
+      setRegisterMessage("Please fill in all fields.");
+      return;
+    }
+
+    if (employeePin.length !== 4) {
+      setRegisterMessage("PIN must be exactly 4 digits.");
+      return;
+    }
+
+    fetch("http://localhost:5000/api/employees", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: employeeName,
+        section: employeeSection,
+        pin: employeePin,
+      }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.employee) {
+          setEmployees((currentEmployees) => [
+            ...currentEmployees,
+            data.employee,
+          ]);
+
+          setRegisterMessage(
+            "Employee registered successfully."
+          );
+
+          setEmployeeName("");
+          setEmployeeSection("");
+          setEmployeePin("");
+        } else {
+          setRegisterMessage(
+            data.message || "Registration failed."
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("Registration error:", error);
+        setRegisterMessage(
+          "Could not connect to the backend."
+        );
+      });
+  };
+
+  // Attendance confirmed screen
   if (started && employee) {
     return (
       <div className="app">
@@ -135,6 +202,8 @@ const verifyPin = () => {
             onClick={() => {
               setEmployee(null);
               setStarted(false);
+              setPin("");
+              setError("");
             }}
           >
             Finish
@@ -144,6 +213,7 @@ const verifyPin = () => {
     );
   }
 
+  // Employee check-in screen
   if (started) {
     return (
       <div className="app">
@@ -169,44 +239,57 @@ const verifyPin = () => {
             attendance verification.
           </p>
 
-         <div className="camera-box">
-  <video
-    ref={videoRef}
-    autoPlay
-    playsInline
-    muted
-  ></video>
-</div>
+          <div className="camera-box">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+            ></video>
+          </div>
+
           <button
             className="start-button"
             onClick={simulateFaceScan}
           >
             Simulate Face Scan
           </button>
+
           <div className="pin-section">
-  <p>Can't be identified? Enter your personal PIN.</p>
+            <p>
+              Can't be identified? Enter your personal PIN.
+            </p>
 
-  <input
-  type="password"
-  inputMode="numeric"
-  placeholder="Enter 4-digit PIN"
-  value={pin}
-  onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-  maxLength="4"
-/>
-  <button
-    className="start-button"
-    onClick={verifyPin}
-  >
-    Verify PIN
-  </button>
+            <input
+              type="password"
+              inputMode="numeric"
+              placeholder="Enter 4-digit PIN"
+              value={pin}
+              onChange={(e) =>
+                setPin(e.target.value.replace(/\D/g, ""))
+              }
+              maxLength="4"
+            />
 
-  {error && <p className="error-message">{error}</p>}
-</div>
+            <button
+              className="start-button"
+              onClick={verifyPin}
+            >
+              Verify PIN
+            </button>
+
+            {error && (
+              <p className="error-message">{error}</p>
+            )}
+          </div>
 
           <button
             className="back-button"
-            onClick={() => setStarted(false)}
+            onClick={() => {
+              setStarted(false);
+              setPin("");
+              setError("");
+            }}
           >
             ← Back
           </button>
@@ -215,6 +298,7 @@ const verifyPin = () => {
     );
   }
 
+  // Main SmartAttend screen
   return (
     <div className="app">
       <header className="header">
@@ -230,60 +314,147 @@ const verifyPin = () => {
       </header>
 
       <main className="main">
-      <div className="backend-status">
-  {backendMessage && (
-    <p>🟢 Backend: {backendMessage}</p>
-  )}
-</div>
-        <section className="hero">
-          <p className="welcome">WELCOME TO SMARTATTEND</p>
+        {showRegister ? (
+          <section className="register-section">
+            <p className="welcome">EMPLOYEE MANAGEMENT</p>
 
-          <h1>
-            Smart attendance.
-            <br />
-            <span>Simple & secure.</span>
-          </h1>
+            <h1>Register New Employee</h1>
 
-          <p className="description">
-            A modern attendance management system designed to make
-            employee check-in fast, accurate and effortless.
-          </p>
-
-          <button
-            className="start-button"
-            onClick={() => setStarted(true)}
-          >
-            Start Attendance
-          </button>
-        </section>
-
-        <section className="features">
-          <div className="feature-card">
-            <div className="feature-icon">◉</div>
-            <h3>Face Recognition</h3>
-            <p>
-              Quickly identify employees using facial recognition.
+            <p className="description">
+              Add a new employee to the SmartAttend system.
             </p>
-          </div>
 
-          <div className="feature-card">
-            <div className="feature-icon">✓</div>
-            <h3>Fast Check-In</h3>
-            <p>
-              Record employee arrival time accurately in seconds.
-            </p>
-          </div>
+            <input
+              type="text"
+              placeholder="Employee name"
+              value={employeeName}
+              onChange={(e) =>
+                setEmployeeName(e.target.value)
+              }
+            />
 
-         <div className="feature-card">
-  <div className="feature-icon">▣</div>
-  <h3>Smart Management</h3>
-  <p>
-    Managers can monitor attendance across departments.
-  </p>
-</div>
-</section>
-</main>
-  </div>
+            <input
+              type="text"
+              placeholder="Section"
+              value={employeeSection}
+              onChange={(e) =>
+                setEmployeeSection(e.target.value)
+              }
+            />
+
+            <input
+              type="password"
+              inputMode="numeric"
+              placeholder="4-digit PIN"
+              value={employeePin}
+              onChange={(e) =>
+                setEmployeePin(
+                  e.target.value.replace(/\D/g, "")
+                )
+              }
+              maxLength="4"
+            />
+
+            <button
+              className="start-button"
+              onClick={registerEmployee}
+            >
+              Register Employee
+            </button>
+
+            {registerMessage && (
+              <p>{registerMessage}</p>
+            )}
+
+            <button
+              className="back-button"
+              onClick={() => {
+                setShowRegister(false);
+                setRegisterMessage("");
+              }}
+            >
+              ← Back
+            </button>
+          </section>
+        ) : (
+          <>
+            <div className="backend-status">
+              {backendMessage && (
+                <p>🟢 Backend: {backendMessage}</p>
+              )}
+            </div>
+
+            <section className="hero">
+              <p className="welcome">
+                WELCOME TO SMARTATTEND
+              </p>
+
+              <h1>
+                Smart attendance.
+                <br />
+                <span>Simple & secure.</span>
+              </h1>
+
+              <p className="description">
+                A modern attendance management system
+                designed to make employee check-in fast,
+                accurate and effortless.
+              </p>
+
+              <button
+                className="start-button"
+                onClick={() => setStarted(true)}
+              >
+                Start Attendance
+              </button>
+
+              <button
+                className="back-button"
+                onClick={() => setShowRegister(true)}
+              >
+                Register Employee
+              </button>
+            </section>
+
+            <section className="features">
+              <div className="feature-card">
+                <div className="feature-icon">◉</div>
+
+                <h3>Face Recognition</h3>
+
+                <p>
+                  Quickly identify employees using facial
+                  recognition.
+                </p>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon">✓</div>
+
+                <h3>Fast Check-In</h3>
+
+                <p>
+                  Record employee arrival time accurately
+                  in seconds.
+                </p>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon">▣</div>
+
+                <h3>Smart Management</h3>
+
+                <p>
+                  Managers can monitor attendance across
+                  departments.
+                </p>
+              </div>
+            </section>
+          </>
+        )}
+      </main>
+    </div>
   );
 }
+
 export default App;
