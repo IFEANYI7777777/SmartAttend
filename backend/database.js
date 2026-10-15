@@ -1,7 +1,11 @@
 const Database = require("better-sqlite3");
 
-const db = new Database("smartattend.db");
+const path = require("path");
 
+const dbPath = process.env.DATABASE_PATH ||
+  path.join(__dirname, "smartattend.db");
+
+const db = new Database(dbPath);
 // Employees table
 db.prepare(`
   CREATE TABLE IF NOT EXISTS employees (
